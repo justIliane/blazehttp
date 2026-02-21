@@ -123,6 +123,17 @@ func (r *Response) EncodeHeaders(enc *hpack.Encoder) []byte {
 	return enc.Bytes()
 }
 
+// NumHeaders returns the number of response headers.
+func (r *Response) NumHeaders() int { return r.numHeaders }
+
+// HeaderAt returns the name and value of the header at index i.
+func (r *Response) HeaderAt(i int) ([]byte, []byte) {
+	if i < 0 || i >= r.numHeaders {
+		return nil, nil
+	}
+	return r.headers[i].name, r.headers[i].value
+}
+
 func (r *Response) hasHeader(name []byte) bool {
 	for i := 0; i < r.numHeaders; i++ {
 		if util.EqualFold(r.headers[i].name, name) {

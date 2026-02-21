@@ -161,12 +161,15 @@ func (e *StreamError) Error() string {
 
 // Stream represents a single HTTP/2 stream with its state machine and flow control.
 type Stream struct {
-	ID       uint32
+	id       atomic.Uint32
 	state    atomic.Uint32
 	SendWin  flowcontrol.Window
 	RecvWin  flowcontrol.Window
 	Priority frame.PriorityParam
 }
+
+// ID returns the stream identifier.
+func (s *Stream) ID() uint32 { return s.id.Load() }
 
 // State returns the current stream state.
 func (s *Stream) State() State {
@@ -185,12 +188,12 @@ func (s *Stream) Transition(event Event) error {
 		cur := s.state.Load()
 		curState := State(cur)
 		if curState >= stateCount {
-			return &StreamError{StreamID: s.ID, Code: frame.ErrCodeProtocolError}
+			return &StreamError{StreamID: s.id.Load(), Code: frame.ErrCodeProtocolError}
 		}
 		next := transitionTable[curState][event]
 		if next == stateInvalid {
 			return &StreamError{
-				StreamID: s.ID,
+				StreamID: s.id.Load(),
 				Code:     frame.ErrCodeProtocolError,
 			}
 		}
@@ -201,7 +204,7 @@ func (s *Stream) Transition(event Event) error {
 }
 
 func (s *Stream) reset(id uint32, initialWindowSize int32) {
-	s.ID = id
+	s.id.Store(id)
 	s.state.Store(uint32(StateIdle))
 	s.SendWin.Reset(initialWindowSize)
 	s.RecvWin.Reset(initialWindowSize)
@@ -221,7 +224,7 @@ func acquireStream(id uint32, initialWindowSize int32) *Stream {
 }
 
 func releaseStream(s *Stream) {
-	s.ID = 0
+	s.id.Store(0)
 	s.state.Store(uint32(StateClosed))
 	streamPool.Put(s)
 }

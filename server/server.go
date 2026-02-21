@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"runtime"
@@ -13,34 +14,56 @@ import (
 	"github.com/blazehttp/blazehttp/server/http2"
 )
 
+// HTTP2Config holds HTTP/2-specific server settings.
+type HTTP2Config struct {
+	// MaxConcurrentStreams per connection (default 250).
+	MaxConcurrentStreams uint32
+	// MaxFrameSize is the maximum frame payload size (default 16384).
+	MaxFrameSize uint32
+	// InitialWindowSize is the initial flow-control window (default 1MB).
+	InitialWindowSize uint32
+	// MaxHeaderListSize is the maximum header list size (default 1MB).
+	MaxHeaderListSize uint32
+}
+
 // Server is the main BlazeHTTP server supporting HTTP/1.1 and HTTP/2.
 type Server struct {
 	// Addr is the TCP address to listen on (e.g. ":8443").
 	Addr string
 
-	// Handler handles HTTP/2 requests. For HTTP/1.1, a wrapper is used.
+	// Handler handles requests. It uses the HTTP/2 RequestCtx type, which is
+	// also used for HTTP/1.1 requests via an automatic bridge when HTTP1Handler
+	// is nil. This enables a single handler for both protocols.
 	Handler http2.RequestHandler
 
-	// TLSConfig is the TLS configuration. If nil, defaults are used.
+	// TLSConfig is the TLS configuration. Required for ListenAndServeTLS().
+	// Must include at least one certificate and should set NextProtos to
+	// []string{"h2", "http/1.1"} for HTTP/2 support.
 	TLSConfig *tls.Config
 
-	// Timeouts.
-	ReadTimeout  time.Duration
+	// ReadTimeout is the maximum duration for reading a request.
+	ReadTimeout time.Duration
+	// WriteTimeout is the maximum duration for writing a response.
 	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
+	// IdleTimeout is the maximum time to wait for the next request on a keep-alive connection.
+	IdleTimeout time.Duration
+
+	// MaxRequestBodySize limits request body size (default 4MB).
+	MaxRequestBodySize int
+
+	// HTTP2 holds HTTP/2-specific settings. If nil, defaults are used.
+	HTTP2 *HTTP2Config
 
 	// MaxConcurrentStreams per HTTP/2 connection (default 250).
+	// Deprecated: use HTTP2.MaxConcurrentStreams instead.
 	MaxConcurrentStreams uint32
 
 	// WorkerPoolSize for HTTP/2 request processing (default: NumCPU * 256).
 	WorkerPoolSize int
 
 	// HTTP1Handler optionally overrides the default HTTP/1.1 handler.
-	// If nil, a simple wrapper around Handler is used.
+	// If nil, Handler is used via an automatic protocol bridge.
 	HTTP1Handler http1.RequestHandler
-
-	// MaxRequestBodySize limits request body size.
-	MaxRequestBodySize int
 
 	// Internal state.
 	listener   net.Listener
@@ -61,8 +84,25 @@ func (s *Server) ListenAndServe() error {
 	return s.Serve(ln)
 }
 
-// ListenAndServeTLS starts the server with TLS using cert/key files.
-func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
+// ListenAndServeTLS starts the server with TLS using the pre-configured TLSConfig.
+// TLSConfig must be set and must contain at least one certificate.
+func (s *Server) ListenAndServeTLS() error {
+	if s.TLSConfig == nil || len(s.TLSConfig.Certificates) == 0 {
+		return errors.New("blazehttp: TLSConfig with at least one certificate is required")
+	}
+	tlsConfig := s.TLSConfig.Clone()
+	if len(tlsConfig.NextProtos) == 0 {
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+	}
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		return err
+	}
+	return s.Serve(tls.NewListener(ln, tlsConfig))
+}
+
+// ListenAndServeTLSFiles starts the server with TLS using cert/key files.
+func (s *Server) ListenAndServeTLSFiles(certFile, keyFile string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return err
@@ -180,7 +220,20 @@ func (s *Server) serveHTTP1(conn net.Conn) {
 
 func (s *Server) serveHTTP2(conn net.Conn, wp *http2.WorkerPool) {
 	settings := http2.DefaultServerSettings()
-	if s.MaxConcurrentStreams > 0 {
+	if s.HTTP2 != nil {
+		if s.HTTP2.MaxConcurrentStreams > 0 {
+			settings.MaxConcurrentStreams = s.HTTP2.MaxConcurrentStreams
+		}
+		if s.HTTP2.MaxFrameSize > 0 {
+			settings.MaxFrameSize = s.HTTP2.MaxFrameSize
+		}
+		if s.HTTP2.InitialWindowSize > 0 {
+			settings.InitialWindowSize = s.HTTP2.InitialWindowSize
+		}
+		if s.HTTP2.MaxHeaderListSize > 0 {
+			settings.MaxHeaderListSize = s.HTTP2.MaxHeaderListSize
+		}
+	} else if s.MaxConcurrentStreams > 0 {
 		settings.MaxConcurrentStreams = s.MaxConcurrentStreams
 	}
 	cfg := &http2.ConnConfig{
@@ -195,14 +248,47 @@ func (s *Server) serveHTTP2(conn net.Conn, wp *http2.WorkerPool) {
 	http2.ServeConn(conn, cfg)
 }
 
-// wrapHTTP1Handler wraps the HTTP/2 handler for HTTP/1.1 connections.
+// wrapHTTP1Handler creates an HTTP/1.1 handler that bridges to the unified
+// HTTP/2 handler. It translates the HTTP/1.1 request into an HTTP/2 RequestCtx,
+// calls s.Handler, then copies the response back.
 func (s *Server) wrapHTTP1Handler() http1.RequestHandler {
 	return func(ctx *http1.RequestCtx) {
-		// Simple bridge: map HTTP/1.1 request to HTTP/2 handler.
-		// For Phase 5, HTTP/1.1 uses its own handler directly.
-		ctx.Response.SetStatusCode(200)
-		ctx.Response.SetContentType([]byte("text/plain"))
-		ctx.Response.SetBody([]byte("Hello from BlazeHTTP (HTTP/1.1)\n"))
+		h2ctx := http2.AcquireCtx()
+		defer http2.ReleaseCtx(h2ctx)
+
+		// Set pseudo-headers from HTTP/1.1 request.
+		h2ctx.Request.SetMethod(ctx.Request.Method())
+		h2ctx.Request.SetPath(ctx.Request.Path())
+		h2ctx.Request.SetScheme([]byte("http"))
+
+		// Host header → :authority pseudo-header.
+		if host := ctx.Request.Header([]byte("Host")); host != nil {
+			h2ctx.Request.SetAuthority(host)
+		}
+
+		// Copy regular headers.
+		for i := 0; i < ctx.Request.NumHeaders(); i++ {
+			k, v := ctx.Request.HeaderByIndex(i)
+			h2ctx.Request.AddHeader(k, v)
+		}
+
+		// Copy body.
+		if body := ctx.Request.Body(); len(body) > 0 {
+			h2ctx.Request.SetBody(body)
+		}
+
+		// Call the unified handler.
+		s.Handler(h2ctx)
+
+		// Copy response back to HTTP/1.1.
+		ctx.Response.SetStatusCode(h2ctx.Response.StatusCode())
+		for i := 0; i < h2ctx.Response.NumHeaders(); i++ {
+			k, v := h2ctx.Response.HeaderAt(i)
+			ctx.Response.SetHeader(k, v)
+		}
+		if body := h2ctx.Response.Body(); body != nil {
+			ctx.Response.SetBody(body)
+		}
 	}
 }
 

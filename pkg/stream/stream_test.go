@@ -7,6 +7,12 @@ import (
 	"github.com/blazehttp/blazehttp/pkg/frame"
 )
 
+func newTestStream(id uint32) *Stream {
+	s := &Stream{}
+	s.id.Store(id)
+	return s
+}
+
 // ====================== STATE MACHINE TESTS ======================
 
 func TestTransition_ValidTransitions(t *testing.T) {
@@ -51,7 +57,7 @@ func TestTransition_ValidTransitions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Stream{ID: 1}
+			s := newTestStream(1)
 			s.state.Store(uint32(tt.from))
 
 			err := s.Transition(tt.event)
@@ -124,7 +130,7 @@ func TestTransition_InvalidTransitions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Stream{ID: 1}
+			s := newTestStream(1)
 			s.state.Store(uint32(tt.from))
 
 			err := s.Transition(tt.event)
@@ -150,7 +156,7 @@ func TestTransition_InvalidTransitions(t *testing.T) {
 }
 
 func TestStream_FullLifecycle(t *testing.T) {
-	s := &Stream{ID: 1}
+	s := newTestStream(1)
 	s.state.Store(uint32(StateIdle))
 
 	// idle → open (recv HEADERS)
@@ -183,7 +189,7 @@ func TestStream_FullLifecycle(t *testing.T) {
 
 func TestStream_RSTFromOpen(t *testing.T) {
 	for _, event := range []Event{EventSendRST, EventRecvRST} {
-		s := &Stream{ID: 1}
+		s := newTestStream(1)
 		s.state.Store(uint32(StateOpen))
 		if err := s.Transition(event); err != nil {
 			t.Fatalf("%s from open: %v", event, err)
@@ -196,7 +202,7 @@ func TestStream_RSTFromOpen(t *testing.T) {
 
 func TestStream_PushPromisePath(t *testing.T) {
 	// Server push: idle → reserved(local) → half-closed(remote)
-	s := &Stream{ID: 2}
+	s := newTestStream(2)
 	s.state.Store(uint32(StateIdle))
 	if err := s.Transition(EventSendPush); err != nil {
 		t.Fatalf("send PUSH_PROMISE: %v", err)
@@ -214,7 +220,7 @@ func TestStream_PushPromisePath(t *testing.T) {
 
 func TestStream_RecvPushPromisePath(t *testing.T) {
 	// Client receives push: idle → reserved(remote) → half-closed(local)
-	s := &Stream{ID: 2}
+	s := newTestStream(2)
 	s.state.Store(uint32(StateIdle))
 	if err := s.Transition(EventRecvPush); err != nil {
 		t.Fatalf("recv PUSH_PROMISE: %v", err)
@@ -302,8 +308,8 @@ func TestManager_OpenAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStream(1): %v", err)
 	}
-	if s.ID != 1 {
-		t.Fatalf("ID = %d, want 1", s.ID)
+	if s.ID() != 1 {
+		t.Fatalf("ID = %d, want 1", s.ID())
 	}
 	if s.State() != StateIdle {
 		t.Fatalf("state = %s, want idle", s.State())
@@ -476,7 +482,7 @@ func TestManager_ForEach(t *testing.T) {
 
 	var ids []uint32
 	m.ForEach(func(s *Stream) {
-		ids = append(ids, s.ID)
+		ids = append(ids, s.ID())
 	})
 	if len(ids) != 3 {
 		t.Fatalf("ForEach visited %d streams, want 3", len(ids))
@@ -591,14 +597,14 @@ func TestManager_10000ConcurrentStreams(t *testing.T) {
 			defer wg.Done()
 			// Transition: open → half-closed(local) → closed.
 			if err := s.Transition(EventSendEndStream); err != nil {
-				t.Errorf("stream %d send END_STREAM: %v", s.ID, err)
+				t.Errorf("stream %d send END_STREAM: %v", s.ID(), err)
 				return
 			}
 			if err := s.Transition(EventRecvEndStream); err != nil {
-				t.Errorf("stream %d recv END_STREAM: %v", s.ID, err)
+				t.Errorf("stream %d recv END_STREAM: %v", s.ID(), err)
 				return
 			}
-			m.CloseStream(s.ID)
+			m.CloseStream(s.ID())
 		}(streams[i])
 	}
 	wg.Wait()
@@ -649,8 +655,8 @@ func TestManager_ConcurrentGetStream(t *testing.T) {
 
 func TestStream_Pool(t *testing.T) {
 	s := acquireStream(1, 65535)
-	if s.ID != 1 {
-		t.Fatalf("ID = %d, want 1", s.ID)
+	if s.ID() != 1 {
+		t.Fatalf("ID = %d, want 1", s.ID())
 	}
 	if s.State() != StateIdle {
 		t.Fatalf("state = %s, want idle", s.State())
@@ -666,8 +672,8 @@ func TestStream_Pool(t *testing.T) {
 
 	// Reacquire — should be reset.
 	s2 := acquireStream(3, 32768)
-	if s2.ID != 3 {
-		t.Fatalf("ID = %d, want 3", s2.ID)
+	if s2.ID() != 3 {
+		t.Fatalf("ID = %d, want 3", s2.ID())
 	}
 	if s2.State() != StateIdle {
 		t.Fatalf("state = %s, want idle (after pool reuse)", s2.State())

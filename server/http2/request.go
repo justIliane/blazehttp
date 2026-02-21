@@ -249,6 +249,32 @@ func (r *Request) Body() []byte        { return r.body }
 func (r *Request) ContentLength() int64 { return r.contentLength }
 func (r *Request) StreamID() uint32    { return r.streamID }
 
+// SetMethod sets the request method.
+func (r *Request) SetMethod(m []byte) { r.method = r.copyBytes(m) }
+
+// SetPath sets the request path.
+func (r *Request) SetPath(p []byte) { r.path = r.copyBytes(p) }
+
+// SetScheme sets the request scheme.
+func (r *Request) SetScheme(s []byte) { r.scheme = r.copyBytes(s) }
+
+// SetAuthority sets the request authority (host).
+func (r *Request) SetAuthority(a []byte) { r.authority = r.copyBytes(a) }
+
+// SetBody sets the request body.
+func (r *Request) SetBody(b []byte) { r.body = b }
+
+// AddHeader adds a regular header to the request.
+func (r *Request) AddHeader(name, value []byte) {
+	if r.numHeaders < maxRequestHeaders {
+		r.headers[r.numHeaders] = headerKV{
+			name:  r.copyBytes(name),
+			value: r.copyBytes(value),
+		}
+		r.numHeaders++
+	}
+}
+
 // Header returns the first value for the given header name, or nil.
 func (r *Request) Header(name []byte) []byte {
 	for i := 0; i < r.numHeaders; i++ {

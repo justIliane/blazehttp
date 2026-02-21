@@ -25,6 +25,16 @@ var ctxPool = sync.Pool{
 	New: func() any { return &RequestCtx{} },
 }
 
+// AcquireCtx gets a RequestCtx from the pool, ready for use.
+func AcquireCtx() *RequestCtx {
+	return acquireCtx()
+}
+
+// ReleaseCtx returns a RequestCtx to the pool.
+func ReleaseCtx(ctx *RequestCtx) {
+	releaseCtx(ctx)
+}
+
 func acquireCtx() *RequestCtx {
 	ctx := ctxPool.Get().(*RequestCtx)
 	ctx.Request.Reset()
