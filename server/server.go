@@ -35,6 +35,10 @@ type Server struct {
 	// WorkerPoolSize for HTTP/2 request processing (default: NumCPU * 256).
 	WorkerPoolSize int
 
+	// HTTP1Handler optionally overrides the default HTTP/1.1 handler.
+	// If nil, a simple wrapper around Handler is used.
+	HTTP1Handler http1.RequestHandler
+
 	// MaxRequestBodySize limits request body size.
 	MaxRequestBodySize int
 
@@ -125,6 +129,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			return err
 		}
 
+		setConnOpts(conn)
 		s.trackConn(conn)
 		go s.serveConn(conn, wp)
 	}
@@ -159,8 +164,12 @@ func (s *Server) serveConn(conn net.Conn, wp *http2.WorkerPool) {
 }
 
 func (s *Server) serveHTTP1(conn net.Conn) {
+	h := s.HTTP1Handler
+	if h == nil {
+		h = s.wrapHTTP1Handler()
+	}
 	cfg := &http1.ConnConfig{
-		Handler:        s.wrapHTTP1Handler(),
+		Handler:        h,
 		ReadTimeout:    s.ReadTimeout,
 		WriteTimeout:   s.WriteTimeout,
 		IdleTimeout:    s.IdleTimeout,

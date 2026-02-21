@@ -83,9 +83,11 @@ func (r *Response) SetHeader(key, value []byte) {
 	}
 }
 
+var contentTypeKey = []byte("Content-Type")
+
 // SetContentType is a convenience method for setting Content-Type.
 func (r *Response) SetContentType(ct []byte) {
-	r.SetHeader([]byte("Content-Type"), ct)
+	r.SetHeader(contentTypeKey, ct)
 }
 
 // SetBody sets the response body.
