@@ -53,6 +53,12 @@ type ConnConfig struct {
 	MaxRequestBodySize int
 }
 
+// Flood protection thresholds.
+const (
+	maxControlFramesPerWindow = 1000        // PING + SETTINGS + RST_STREAM
+	controlFrameWindow        = 10 * time.Second
+)
+
 // serverConn represents a single HTTP/2 server-side connection.
 type serverConn struct {
 	conn net.Conn
@@ -85,28 +91,41 @@ type serverConn struct {
 	inFlight   atomic.Int32 // number of requests submitted to worker pool but not yet sent
 	done       chan struct{}
 	closeOnce  sync.Once
+
+	// Flood protection (CVE-2023-44487, PING/SETTINGS/RST floods).
+	controlFrameCount int
+	controlFrameReset time.Time
+
+	// Flow control: signaled when WINDOW_UPDATE or SETTINGS changes send window.
+	sendWinNotify chan struct{}
+
+	// completedStreams: writeLoop sends closed stream IDs here so the readLoop
+	// can call CloseStream, keeping activeCount accurate for concurrency checks.
+	completedStreams chan uint32
 }
 
 // ServeConn serves HTTP/2 on the given connection.
 func ServeConn(conn net.Conn, cfg *ConnConfig) error {
 	sc := &serverConn{
-		conn:          conn,
-		fr:            frame.AcquireFrameReader(conn),
-		fw:            frame.AcquireFrameWriter(conn),
-		enc:           hpack.AcquireEncoder(),
-		dec:           hpack.AcquireDecoder(),
-		streams:       stream.NewManager(cfg.Settings.MaxConcurrentStreams, int32(cfg.Settings.InitialWindowSize)),
-		sendWin:       flowcontrol.NewWindow(int32(flowcontrol.DefaultInitialWindowSize)),
-		recvWin:       flowcontrol.NewWindow(int32(cfg.Settings.InitialWindowSize)),
-		localSettings: cfg.Settings,
-		peerSettings:  DefaultPeerSettings(),
-		controlCh:     make(chan writeItem, 64),
-		responseCh:    make(chan *RequestCtx, 256),
-		pending:       make(map[uint32]*RequestCtx, 64),
-		cfg:           cfg,
-		remoteAddr:    conn.RemoteAddr(),
-		localAddr:     conn.LocalAddr(),
-		done:          make(chan struct{}),
+		conn:             conn,
+		fr:               frame.AcquireFrameReader(conn),
+		fw:               frame.AcquireFrameWriter(conn),
+		enc:              hpack.AcquireEncoder(),
+		dec:              hpack.AcquireDecoder(),
+		streams:          stream.NewManager(cfg.Settings.MaxConcurrentStreams, int32(cfg.Settings.InitialWindowSize)),
+		sendWin:          flowcontrol.NewWindow(int32(flowcontrol.DefaultInitialWindowSize)),
+		recvWin:          flowcontrol.NewWindow(int32(cfg.Settings.InitialWindowSize)),
+		localSettings:    cfg.Settings,
+		peerSettings:     DefaultPeerSettings(),
+		controlCh:        make(chan writeItem, 64),
+		responseCh:       make(chan *RequestCtx, 256),
+		pending:          make(map[uint32]*RequestCtx, 64),
+		cfg:              cfg,
+		remoteAddr:       conn.RemoteAddr(),
+		localAddr:        conn.LocalAddr(),
+		done:             make(chan struct{}),
+		sendWinNotify:    make(chan struct{}, 1),
+		completedStreams: make(chan uint32, 256),
 	}
 
 	defer sc.cleanup()
@@ -185,7 +204,12 @@ func (sc *serverConn) readClientPreface() error {
 }
 
 func (sc *serverConn) readLoop() error {
+	sc.controlFrameReset = time.Now()
+
 	for {
+		// Drain completed streams so activeCount stays accurate for concurrency checks.
+		sc.drainCompletedStreams()
+
 		if sc.cfg.IdleTimeout > 0 {
 			sc.conn.SetReadDeadline(time.Now().Add(sc.cfg.IdleTimeout))
 		}
@@ -198,33 +222,38 @@ func (sc *serverConn) readLoop() error {
 			return err
 		}
 
+		var handlerErr error
 		switch f.Type {
 		case frame.FrameHeaders:
-			if err := sc.handleHeaders(f); err != nil {
-				return err
-			}
+			handlerErr = sc.handleHeaders(f)
 		case frame.FrameData:
-			if err := sc.handleData(f); err != nil {
-				return err
-			}
+			handlerErr = sc.handleData(f)
 		case frame.FrameSettings:
-			if err := sc.handleSettings(f); err != nil {
-				return err
-			}
+			handlerErr = sc.handleSettings(f)
 		case frame.FramePing:
-			sc.handlePing(f)
+			handlerErr = sc.handlePing(f)
 		case frame.FrameWindowUpdate:
-			if err := sc.handleWindowUpdate(f); err != nil {
-				return err
-			}
+			handlerErr = sc.handleWindowUpdate(f)
 		case frame.FrameRSTStream:
-			sc.handleRSTStream(f)
+			handlerErr = sc.handleRSTStream(f)
 		case frame.FrameGoAway:
 			sc.handleGoAway(f)
 		case frame.FramePriority:
-			// Deprecated in RFC 9113; ignore.
+			sc.handlePriority(f)
+		case frame.FramePushPromise:
+			// Clients MUST NOT send PUSH_PROMISE per RFC 9113 §8.4.
+			handlerErr = &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "client sent PUSH_PROMISE"}
 		default:
 			// Unknown frame types: ignore per RFC 9113 §4.1.
+		}
+
+		if handlerErr != nil {
+			if connErr, ok := handlerErr.(*frame.ConnError); ok {
+				sc.goAway(connErr.Code, []byte(connErr.Reason))
+				// Give the write loop time to flush the GOAWAY frame.
+				time.Sleep(5 * time.Millisecond)
+			}
+			return handlerErr
 		}
 	}
 }
@@ -232,6 +261,11 @@ func (sc *serverConn) readLoop() error {
 
 func (sc *serverConn) handleHeaders(f *frame.Frame) error {
 	streamID := f.StreamID
+
+	// Clients MUST use odd-numbered stream IDs per RFC 9113 §5.1.1.
+	if streamID%2 == 0 {
+		return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "client used even stream ID"}
+	}
 
 	// Decode HPACK.
 	fields, err := sc.dec.Decode(f.HeaderBlock)
@@ -242,6 +276,19 @@ func (sc *serverConn) handleHeaders(f *frame.Frame) error {
 	// Check if this is trailing headers on an existing stream.
 	existingStream := sc.streams.GetStream(streamID)
 	if existingStream != nil {
+		state := existingStream.State()
+
+		// Receiving HEADERS on a closed stream is a connection error per RFC 9113 §5.1.
+		if state == stream.StateClosed {
+			return &frame.ConnError{Code: frame.ErrCodeStreamClosed, Reason: "HEADERS on closed stream"}
+		}
+
+		// If the stream is half-closed(remote), the client already sent END_STREAM
+		// and MUST NOT send more frames. Per RFC 9113 §5.1.
+		if state == stream.StateHalfClosedRemote {
+			sc.resetStream(streamID, frame.ErrCodeStreamClosed)
+			return nil
+		}
 		if !f.HasEndStream() {
 			sc.resetStream(streamID, frame.ErrCodeProtocolError)
 			return nil
@@ -258,12 +305,22 @@ func (sc *serverConn) handleHeaders(f *frame.Frame) error {
 		return nil
 	}
 
+	// Self-dependency check for HEADERS with PRIORITY per RFC 9113 §5.3.1.
+	if f.HasPriority() && f.StreamDep == streamID {
+		sc.resetStream(streamID, frame.ErrCodeProtocolError)
+		return nil
+	}
+
 	// New stream.
 	s, err := sc.streams.OpenStream(streamID)
 	if err != nil {
 		if err == stream.ErrMaxConcurrentStreams {
 			sc.resetStream(streamID, frame.ErrCodeRefusedStream)
 			return nil
+		}
+		// Stream ID regression means reuse of a closed stream ID.
+		if err == stream.ErrStreamIDRegression {
+			return &frame.ConnError{Code: frame.ErrCodeStreamClosed, Reason: "HEADERS on closed stream"}
 		}
 		return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: err.Error()}
 	}
@@ -305,9 +362,26 @@ func (sc *serverConn) handleHeaders(f *frame.Frame) error {
 func (sc *serverConn) handleData(f *frame.Frame) error {
 	streamID := f.StreamID
 
+	// DATA on an idle stream is a connection error per RFC 9113 §5.1.
+	if sc.streams.IsIdle(streamID) {
+		return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "DATA on idle stream"}
+	}
+
 	s := sc.streams.GetStream(streamID)
 	if s == nil {
-		// Stream may have been reset or closed. Ignore gracefully.
+		// Stream was reset or closed. Still count against connection flow control
+		// per RFC 9113 §5.1 (closed stream), then send STREAM_CLOSED.
+		dataLen := int32(len(f.Data))
+		if dataLen > 0 {
+			sc.recvWin.Consume(dataLen)
+		}
+		sc.resetStream(streamID, frame.ErrCodeStreamClosed)
+		return nil
+	}
+
+	// DATA on half-closed(remote) is a stream error per RFC 9113 §5.1.
+	if s.State() == stream.StateHalfClosedRemote {
+		sc.resetStream(streamID, frame.ErrCodeStreamClosed)
 		return nil
 	}
 
@@ -340,6 +414,15 @@ func (sc *serverConn) handleData(f *frame.Frame) error {
 	sc.maybeUpdateWindow(streamID, s, dataLen)
 
 	if f.HasEndStream() {
+		// Validate content-length if specified per RFC 9113 §8.1.1.
+		if ctx.Request.contentLength >= 0 && int64(len(ctx.Request.body)) != ctx.Request.contentLength {
+			sc.resetStream(streamID, frame.ErrCodeProtocolError)
+			sc.pendingMu.Lock()
+			delete(sc.pending, streamID)
+			sc.pendingMu.Unlock()
+			releaseCtx(ctx)
+			return nil
+		}
 		s.Transition(stream.EventRecvEndStream)
 		sc.pendingMu.Lock()
 		delete(sc.pending, streamID)
@@ -388,6 +471,9 @@ func (sc *serverConn) handleSettings(f *frame.Frame) error {
 		// Our SETTINGS was acknowledged.
 		return nil
 	}
+	if sc.checkControlFlood() {
+		return &frame.ConnError{Code: frame.ErrCodeEnhanceYourCalm, Reason: "SETTINGS flood detected"}
+	}
 	if err := sc.applyPeerSettings(f); err != nil {
 		return err
 	}
@@ -412,40 +498,76 @@ func (sc *serverConn) applyPeerSettings(f *frame.Frame) error {
 		if err := sc.streams.AdjustInitialWindowSize(int32(sc.peerSettings.InitialWindowSize)); err != nil {
 			return err
 		}
+		sc.notifySendWin()
 	}
 
 	return nil
 }
 
-func (sc *serverConn) handlePing(f *frame.Frame) {
+func (sc *serverConn) handlePing(f *frame.Frame) error {
 	if f.Flags.Has(frame.FlagACK) {
-		return
+		return nil
+	}
+	if sc.checkControlFlood() {
+		return &frame.ConnError{Code: frame.ErrCodeEnhanceYourCalm, Reason: "PING flood detected"}
 	}
 	sc.enqueueControl(writeItem{
 		typ:      writePing,
 		pingData: f.PingData,
 	})
+	return nil
 }
 
 func (sc *serverConn) handleWindowUpdate(f *frame.Frame) error {
 	increment := int32(f.WindowIncrement)
+
 	if f.StreamID == 0 {
+		// Connection-level WINDOW_UPDATE.
+		if increment == 0 {
+			return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "WINDOW_UPDATE increment 0 on connection"}
+		}
 		if err := sc.sendWin.Update(increment); err != nil {
 			return &frame.ConnError{Code: frame.ErrCodeFlowControlError, Reason: "connection send window overflow"}
 		}
+		sc.notifySendWin()
 		return nil
 	}
+
+	// Stream-level WINDOW_UPDATE on idle stream is a protocol error per RFC 9113 §5.1.
+	if sc.streams.IsIdle(f.StreamID) {
+		return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "WINDOW_UPDATE on idle stream"}
+	}
+
+	// Stream-level WINDOW_UPDATE with 0 increment is a stream error per RFC 9113 §6.9.
+	if increment == 0 {
+		sc.resetStream(f.StreamID, frame.ErrCodeProtocolError)
+		return nil
+	}
+
 	s := sc.streams.GetStream(f.StreamID)
 	if s == nil {
+		// Closed stream — ignore.
 		return nil
 	}
 	if err := s.SendWin.Update(increment); err != nil {
 		sc.resetStream(f.StreamID, frame.ErrCodeFlowControlError)
+		return nil
 	}
+	sc.notifySendWin()
 	return nil
 }
 
-func (sc *serverConn) handleRSTStream(f *frame.Frame) {
+func (sc *serverConn) handleRSTStream(f *frame.Frame) error {
+	// RST_STREAM on an idle stream is a connection error per RFC 9113 §5.1.
+	if sc.streams.IsIdle(f.StreamID) {
+		return &frame.ConnError{Code: frame.ErrCodeProtocolError, Reason: "RST_STREAM on idle stream"}
+	}
+
+	// CVE-2023-44487: rapid reset attack detection.
+	if sc.checkControlFlood() {
+		return &frame.ConnError{Code: frame.ErrCodeEnhanceYourCalm, Reason: "rapid reset flood detected"}
+	}
+
 	s := sc.streams.GetStream(f.StreamID)
 	if s != nil {
 		s.Transition(stream.EventRecvRST)
@@ -458,6 +580,48 @@ func (sc *serverConn) handleRSTStream(f *frame.Frame) {
 		releaseCtx(ctx)
 	}
 	sc.streams.CloseStream(f.StreamID)
+	return nil
+}
+
+// drainCompletedStreams closes streams that the writeLoop has finished
+// responding to, so that activeCount stays accurate.
+func (sc *serverConn) drainCompletedStreams() {
+	for {
+		select {
+		case id := <-sc.completedStreams:
+			sc.streams.CloseStream(id)
+		default:
+			return
+		}
+	}
+}
+
+// notifySendWin signals the writeLoop that send window space is available.
+func (sc *serverConn) notifySendWin() {
+	select {
+	case sc.sendWinNotify <- struct{}{}:
+	default:
+	}
+}
+
+func (sc *serverConn) handlePriority(f *frame.Frame) {
+	// PRIORITY is deprecated in RFC 9113, but we must still validate:
+	// self-dependency is a stream error per RFC 9113 §5.3.1.
+	if f.StreamDep == f.StreamID {
+		sc.resetStream(f.StreamID, frame.ErrCodeProtocolError)
+	}
+}
+
+// checkControlFlood increments the control frame counter and returns true
+// if the flood threshold has been exceeded.
+func (sc *serverConn) checkControlFlood() bool {
+	now := time.Now()
+	if now.Sub(sc.controlFrameReset) > controlFrameWindow {
+		sc.controlFrameCount = 0
+		sc.controlFrameReset = now
+	}
+	sc.controlFrameCount++
+	return sc.controlFrameCount > maxControlFramesPerWindow
 }
 
 func (sc *serverConn) handleGoAway(f *frame.Frame) {
@@ -548,13 +712,21 @@ func (sc *serverConn) sendResponse(ctx *RequestCtx) {
 	// Transition: send END_STREAM → closes the stream from our side.
 	s.Transition(stream.EventSendEndStream)
 
-	sc.streams.CloseStream(streamID)
+	// Notify readLoop to close the stream (keeps activeCount accurate for
+	// concurrent stream limit enforcement).
+	select {
+	case sc.completedStreams <- streamID:
+	case <-sc.done:
+	}
+
 	sc.inFlight.Add(-1)
 	releaseCtx(ctx)
 }
 
 func (sc *serverConn) writeDataFrames(streamID uint32, data []byte, endStream bool) {
 	maxFrameSize := int(sc.peerSettings.MaxFrameSize)
+	timeout := time.NewTimer(10 * time.Second)
+	defer timeout.Stop()
 
 	for len(data) > 0 {
 		s := sc.streams.GetStream(streamID)
@@ -570,10 +742,17 @@ func (sc *serverConn) writeDataFrames(streamID uint32, data []byte, endStream bo
 		// Respect connection-level send window.
 		connAvail := int(sc.sendWin.Available())
 		if connAvail <= 0 {
-			// Flow control blocked — write what we have so far and retry.
-			// In a production server we'd park the write and resume on WINDOW_UPDATE.
-			// For now, break and the remaining data is lost (acceptable for Phase 5 MVP).
-			break
+			// Flow control blocked — flush pending frames and wait for WINDOW_UPDATE.
+			if sc.fw.Buffered() > 0 {
+				if err := sc.fw.Flush(); err != nil {
+					return
+				}
+			}
+			// Process control frames while waiting (includes WINDOW_UPDATE).
+			if !sc.waitForSendWindow(timeout.C) {
+				return
+			}
+			continue
 		}
 		if chunk > connAvail {
 			chunk = connAvail
@@ -582,7 +761,16 @@ func (sc *serverConn) writeDataFrames(streamID uint32, data []byte, endStream bo
 		// Respect stream-level send window.
 		streamAvail := int(s.SendWin.Available())
 		if streamAvail <= 0 {
-			break
+			// Flush and wait for stream-level WINDOW_UPDATE or SETTINGS change.
+			if sc.fw.Buffered() > 0 {
+				if err := sc.fw.Flush(); err != nil {
+					return
+				}
+			}
+			if !sc.waitForSendWindow(timeout.C) {
+				return
+			}
+			continue
 		}
 		if chunk > streamAvail {
 			chunk = streamAvail
@@ -595,6 +783,29 @@ func (sc *serverConn) writeDataFrames(streamID uint32, data []byte, endStream bo
 		s.SendWin.Consume(int32(chunk))
 
 		data = data[chunk:]
+	}
+}
+
+// waitForSendWindow waits for a send window notification while processing
+// control frames. Returns false if connection is closing or timed out.
+func (sc *serverConn) waitForSendWindow(timeoutCh <-chan time.Time) bool {
+	for {
+		select {
+		case <-sc.sendWinNotify:
+			return true
+		case item := <-sc.controlCh:
+			sc.writeControlFrame(item)
+			if sc.fw.Buffered() > 0 {
+				if sc.cfg.WriteTimeout > 0 {
+					sc.conn.SetWriteDeadline(time.Now().Add(sc.cfg.WriteTimeout))
+				}
+				sc.fw.Flush()
+			}
+		case <-sc.done:
+			return false
+		case <-timeoutCh:
+			return false
+		}
 	}
 }
 

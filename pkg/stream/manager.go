@@ -195,3 +195,17 @@ func (m *Manager) LastServerStreamID() uint32 {
 	m.mu.RUnlock()
 	return id
 }
+
+// IsIdle reports whether the given stream ID refers to a stream in the idle state.
+// A stream is idle if it has never been opened (ID exceeds the highest seen for its parity).
+func (m *Manager) IsIdle(id uint32) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if _, ok := m.streams[id]; ok {
+		return false // active stream
+	}
+	if id%2 == 1 {
+		return id > m.lastClientID
+	}
+	return id > m.lastServerID
+}

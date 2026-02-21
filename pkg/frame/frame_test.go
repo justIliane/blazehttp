@@ -561,8 +561,19 @@ func TestConformance_PingOnNonZeroStream(t *testing.T) {
 }
 
 func TestConformance_WindowUpdateZero(t *testing.T) {
+	// 0-increment validation is now handled at the connection layer (conn.go)
+	// because stream 0 requires a connection error while stream N requires a stream error.
+	// The frame reader should parse the frame successfully.
 	data := encodeFrame(FrameWindowUpdate, 0, 1, []byte{0, 0, 0, 0})
-	readError(t, data, ErrCodeProtocolError)
+	fr := AcquireFrameReader(bytes.NewReader(data))
+	defer ReleaseFrameReader(fr)
+	f, err := fr.ReadFrame()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f.WindowIncrement != 0 {
+		t.Fatalf("expected increment 0, got %d", f.WindowIncrement)
+	}
 }
 
 func TestConformance_WindowUpdateWrongSize(t *testing.T) {

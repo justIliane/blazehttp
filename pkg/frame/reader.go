@@ -365,9 +365,8 @@ func (fr *FrameReader) parseWindowUpdate(f *Frame, payload []byte) (*Frame, erro
 		return nil, &ConnError{Code: ErrCodeFrameSizeError, Reason: "WINDOW_UPDATE frame must be 4 bytes"}
 	}
 	f.WindowIncrement = (uint32(payload[0])<<24 | uint32(payload[1])<<16 | uint32(payload[2])<<8 | uint32(payload[3])) & 0x7FFFFFFF
-	if f.WindowIncrement == 0 {
-		return nil, &ConnError{Code: ErrCodeProtocolError, Reason: "WINDOW_UPDATE increment must be non-zero"}
-	}
+	// Note: 0-increment validation is handled by the connection layer (conn.go)
+	// because stream 0 requires a connection error while stream N requires a stream error.
 	return f, nil
 }
 

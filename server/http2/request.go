@@ -118,6 +118,10 @@ func (r *Request) FromHeaders(fields []hpack.DecodedField) error {
 				if r.path != nil {
 					return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
 				}
+				// Empty :path is not allowed per RFC 9113 §8.3.1.
+				if len(value) == 0 {
+					return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+				}
 				r.path = r.copyBytes(value)
 			case ":authority":
 				if r.authority != nil {
@@ -130,9 +134,21 @@ func (r *Request) FromHeaders(fields []hpack.DecodedField) error {
 		} else {
 			pseudoDone = true
 
+			// Reject uppercase header field names per RFC 9113 §8.2.1.
+			if hasUppercase(name) {
+				return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+			}
+
 			// Reject connection-specific headers per RFC 9113 §8.2.2.
 			if isConnectionHeader(name) {
 				return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+			}
+
+			// TE header: only "trailers" is allowed per RFC 9113 §8.2.2.
+			if len(name) == 2 && string(name) == "te" {
+				if string(value) != "trailers" {
+					return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+				}
 			}
 
 			// Parse content-length.
@@ -156,12 +172,28 @@ func (r *Request) FromHeaders(fields []hpack.DecodedField) error {
 	if r.method == nil {
 		return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
 	}
-	// :path is required for all methods except CONNECT.
-	if string(r.method) != "CONNECT" && r.path == nil {
-		return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+	// For non-CONNECT methods, :scheme and :path are required per RFC 9113 §8.3.1.
+	if string(r.method) != "CONNECT" {
+		if r.path == nil {
+			return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+		}
+		if r.scheme == nil {
+			return &StreamError{StreamID: r.streamID, Code: frame.ErrCodeProtocolError}
+		}
 	}
 
 	return nil
+}
+
+// hasUppercase reports whether name contains any uppercase ASCII letter.
+// HTTP/2 header field names MUST be lowercase per RFC 9113 §8.2.1.
+func hasUppercase(name []byte) bool {
+	for _, c := range name {
+		if c >= 'A' && c <= 'Z' {
+			return true
+		}
+	}
+	return false
 }
 
 // isConnectionHeader returns true if the header is connection-specific
