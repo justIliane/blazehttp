@@ -40,7 +40,7 @@ func AcquireEncoder() *Encoder {
 
 // ReleaseEncoder returns an Encoder to the pool.
 func ReleaseEncoder(e *Encoder) {
-	e.Reset()
+	e.ResetConnection()
 	encoderPool.Put(e)
 }
 
