@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://onvi3bhqlbq6rqxv.public.blob.vercel-storage.com/blazehttplogoe.png" alt="BlazeHTTP" width="400">
+  <img src="https://onvi3bhqlbq6rqxv.public.blob.vercel-storage.com/blazehttplogoe.png" alt="BlazeHTTP" width="650">
 </p>
 
 <h3 align="center">⚡ High-performance HTTP/1.1 + HTTP/2 server & client for Go</h3>
