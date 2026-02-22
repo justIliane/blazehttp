@@ -40,9 +40,9 @@ Zero external dependencies for the core protocol stack. Every component — HPAC
 
 | Latency (Plaintext) | BlazeHTTP | fasthttp | Delta |
 |----------|-----------|----------|-------|
-| p50 | **179 µs** | 216 µs | **-17%** |
-| p75 | **331 µs** | 363 µs | **-9%** |
-| p99 | 6.41 ms | 6.26 ms | +2% |
+| p50 | **179 µs** | 216 µs | **17% faster** |
+| p75 | **331 µs** | 363 µs | **9% faster** |
+| p99 | 6.41 ms | 6.26 ms | ~equal |
 
 ### HTTP/2: BlazeHTTP vs net/http
 
@@ -56,8 +56,8 @@ Zero external dependencies for the core protocol stack. Every component — HPAC
 
 | Latency (100 streams) | BlazeHTTP | net/http | Delta |
 |---------|-----------|----------|-------|
-| mean | **20.29 ms** | 40.35 ms | **-50%** |
-| time to first byte | **136.58 ms** | 168.35 ms | **-19%** |
+| mean | **20.29 ms** | 40.35 ms | **2x faster** |
+| time to first byte | **136.58 ms** | 168.35 ms | **19% faster** |
 
 ### Header Parsing: BlazeHTTP vs fasthttp
 
