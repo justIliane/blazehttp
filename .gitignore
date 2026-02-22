@@ -1,18 +1,42 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
 # Test binaries
 *.test
 
 # Coverage files
 *.out
+coverage.html
 
 # CPU/memory profiles
 *.prof
 *.trace
+
+# Go build cache
+/vendor/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Debug
+__debug_bin*
+
+# Local config
+.env
+.envrc
+
+# Development prompts
+intructions.md
+newinstructions.md

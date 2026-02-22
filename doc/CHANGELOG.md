@@ -1,5 +1,63 @@
 # Changelog
 
+## Phase 9.5 — Anti-Detection Validation
+
+- Updated Akamai hash to 4-section format (settings|window|priorities|pseudoHeaders)
+- JA3/JA4 verified via local TLS server capture (Chrome ≠ Go default)
+- JA4 stability verified across 5 connections (immune to extension randomization)
+- HTTP/2 SETTINGS verified for Chrome and Firefox (IDs, values, order)
+- Pseudo-header order verified: Chrome (m,a,s,p), Firefox (m,p,a,s)
+- 100 multiplexed requests in < 200ms on local server
+- Client benchmarks: 15,500+ req/s multiplexed, ~135µs single request
+- Optional E2E test against tls.peet.ws
+- Complete client documentation: `doc/CLIENT.md`
+
+## Phase 9.4 — Client API & Features
+
+- High-level `Client` with `Do()`, `Get()`, `Post()`, `Head()`, `DoBatch()`, `Close()`
+- Browser constructors: `NewChromeClient()`, `NewFirefoxClient()`, `NewSafariClient()`, `NewRandomClient()`
+- Thread-safe `CookieJar` with domain/path matching, expiry, secure flag
+- Redirect following: 301/302/303 → GET, 307/308 → preserve method+body
+- Retry with exponential backoff + jitter
+- HTTP CONNECT + SOCKS5 proxy support (fingerprint preserved through tunnel)
+- `Request` builder with `SetHeader`, `SetBody`, `SetCookie`, header ordering
+- `Response` with `Header()`, `Cookies()`, `Release()`
+
+## Phase 9.3 — Connection Pool
+
+- Auto-scaling connection pool with transparent HTTP/2 multiplexing
+- Max 6 connections per host, 2 idle per host (configurable)
+- Health checks via periodic PING
+- GOAWAY-aware connection eviction with automatic retry
+- Wait timeout for backpressure when all connections saturated
+- Dial timeout configuration
+
+## Phase 9.2 — Client HTTP/2 Connection
+
+- `ClientConn` with full HTTP/2 handshake (preface, SETTINGS exchange)
+- Read loop + write loop with separate goroutines
+- Concurrent `roundTrip` with stream multiplexing
+- GOAWAY handling with graceful shutdown
+- Flow control (connection + stream level) with WINDOW_UPDATE
+- Server PING response
+
+## Phase 9.1 — HTTP/2 Fingerprinting
+
+- `H2Profile` type capturing SETTINGS, WINDOW_UPDATE, pseudo-header order, PRIORITY frames
+- Chrome 120+ and Firefox 121+ H2 profiles with exact browser values
+- Akamai HTTP/2 fingerprint hash computation
+- Default headers and header ordering per browser
+- `Clone()` for safe concurrent use
+
+## Phase 9.0 — TLS Fingerprinting
+
+- Integrated uTLS for browser-grade TLS ClientHello
+- JA3 and JA4 computation from raw ClientHello bytes
+- ClientHello parsing (cipher suites, extensions, supported groups, signature algorithms)
+- 8 browser profiles: Chrome120, ChromeLatest, Firefox121, FirefoxLatest, Safari17, SafariIOS, Randomized, GoDefault
+- `TLSDialer` with configurable fingerprint, timeout, skip verify
+- `DialOverConn` for TLS over proxy tunnels
+
 ## Phase 8 — User API & Documentation
 
 - Added `HTTP2Config` struct for grouped HTTP/2 settings
