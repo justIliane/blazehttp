@@ -43,7 +43,11 @@ func (r *Response) Release() {
 }
 
 // fromH2Response converts a low-level h2Response to a high-level Response.
+// Returns nil if h2 is nil (connection closed before response arrived).
 func fromH2Response(h2 *h2Response, reqURL string) *Response {
+	if h2 == nil {
+		return nil
+	}
 	return &Response{
 		StatusCode: h2.StatusCode,
 		Headers:    h2.Headers,

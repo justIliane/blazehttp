@@ -228,6 +228,12 @@ func (p *ConnPool) roundTrip(addr string, req *h2Request) (*h2Response, error) {
 
 		resp, err := cc.roundTrip(req)
 		if err == nil {
+			if resp == nil {
+				// Connection closed between roundTrip return and response delivery.
+				// Treat as a connection-level error and retry.
+				p.removeConn(addr, cc)
+				continue
+			}
 			p.cond.Broadcast() // stream freed, wake waiters
 			return resp, nil
 		}

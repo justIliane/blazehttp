@@ -184,6 +184,9 @@ func (c *Client) doOnce(req *Request) (*Response, error) {
 		}
 
 		resp := fromH2Response(h2resp, req.rawURL)
+		if resp == nil {
+			return nil, fmt.Errorf("client: nil response from %s (connection closed)", addr)
+		}
 
 		// Store cookies from response.
 		if c.CookieJar != nil {
