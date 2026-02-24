@@ -3,8 +3,8 @@ package http2
 import (
 	"testing"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
 )
 
 // === Request tests ===

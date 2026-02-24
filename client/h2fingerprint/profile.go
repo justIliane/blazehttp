@@ -5,7 +5,7 @@
 package h2fingerprint
 
 import (
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 // H2Profile describes an HTTP/2 connection-level fingerprint.

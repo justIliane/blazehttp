@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blazehttp/blazehttp/client/h2fingerprint"
-	blazetls "github.com/blazehttp/blazehttp/client/tls"
-	"github.com/blazehttp/blazehttp/pkg/flowcontrol"
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
-	"github.com/blazehttp/blazehttp/pkg/stream"
+	"github.com/justIliane/blazehttp/client/h2fingerprint"
+	blazetls "github.com/justIliane/blazehttp/client/tls"
+	"github.com/justIliane/blazehttp/pkg/flowcontrol"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/pkg/stream"
 )
 
 // HTTP/2 connection preface sent by the client.

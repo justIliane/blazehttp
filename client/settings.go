@@ -1,6 +1,6 @@
 package client
 
-import "github.com/blazehttp/blazehttp/pkg/frame"
+import "github.com/justIliane/blazehttp/pkg/frame"
 
 // peerSettings tracks the server's HTTP/2 settings.
 type peerSettings struct {

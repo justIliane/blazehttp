@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 func TestWindow_Basic(t *testing.T) {

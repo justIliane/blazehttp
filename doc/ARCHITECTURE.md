@@ -3,7 +3,7 @@
 ## Package Structure
 
 ```
-github.com/blazehttp/blazehttp
+github.com/justIliane/blazehttp
 ├── blazehttp.go              net/http adapters (WrapHandler, WrapBlazeHandler)
 ├── server/
 │   ├── server.go             Server struct, listener, connection dispatch

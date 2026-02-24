@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // WrapHandler adapts a standard net/http.Handler for use with BlazeHTTP.

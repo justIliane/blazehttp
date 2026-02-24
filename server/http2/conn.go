@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blazehttp/blazehttp/pkg/bytespool"
-	"github.com/blazehttp/blazehttp/pkg/flowcontrol"
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
-	"github.com/blazehttp/blazehttp/pkg/stream"
+	"github.com/justIliane/blazehttp/pkg/bytespool"
+	"github.com/justIliane/blazehttp/pkg/flowcontrol"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/pkg/stream"
 )
 
 // clientPreface is the HTTP/2 connection preface that the client must send.

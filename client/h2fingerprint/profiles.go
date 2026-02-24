@@ -1,7 +1,7 @@
 package h2fingerprint
 
 import (
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 // Pre-defined HTTP/2 fingerprint profiles matching real browsers.

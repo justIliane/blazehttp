@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/server"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server"
+	"github.com/justIliane/blazehttp/server/http2"
 
 	xhttp2 "golang.org/x/net/http2"
 )

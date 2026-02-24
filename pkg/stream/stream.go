@@ -6,8 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/blazehttp/blazehttp/pkg/flowcontrol"
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/flowcontrol"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 // Stream states per RFC 9113 §5.1.

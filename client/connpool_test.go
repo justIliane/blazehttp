@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/client/h2fingerprint"
-	blazetls "github.com/blazehttp/blazehttp/client/tls"
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/client/h2fingerprint"
+	blazetls "github.com/justIliane/blazehttp/client/tls"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // testH2ServerPool starts a TLS+HTTP/2 server with enough worker capacity

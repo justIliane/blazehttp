@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/blazehttp/blazehttp/server"
-	"github.com/blazehttp/blazehttp/server/http1"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server"
+	"github.com/justIliane/blazehttp/server/http1"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // Pre-allocated payloads (zero allocs in handler).

@@ -3,8 +3,8 @@ package http2
 import (
 	"sync"
 
-	"github.com/blazehttp/blazehttp/internal/util"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/internal/util"
+	"github.com/justIliane/blazehttp/pkg/hpack"
 )
 
 const maxRespHeaders = 32

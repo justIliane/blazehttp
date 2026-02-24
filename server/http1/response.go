@@ -3,8 +3,8 @@ package http1
 import (
 	"sync"
 
-	"github.com/blazehttp/blazehttp/internal/util"
-	"github.com/blazehttp/blazehttp/pkg/bytespool"
+	"github.com/justIliane/blazehttp/internal/util"
+	"github.com/justIliane/blazehttp/pkg/bytespool"
 )
 
 const defaultBufSize = 4096

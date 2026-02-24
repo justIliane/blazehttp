@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blazehttp/blazehttp/pkg/bytespool"
+	"github.com/justIliane/blazehttp/pkg/bytespool"
 )
 
 const (

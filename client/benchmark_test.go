@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/client/h2fingerprint"
-	blazetls "github.com/blazehttp/blazehttp/client/tls"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/client/h2fingerprint"
+	blazetls "github.com/justIliane/blazehttp/client/tls"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // BenchmarkClient_SingleRequest measures single request latency through

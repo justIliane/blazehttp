@@ -10,8 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/blazehttp/blazehttp/server"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 func handler(ctx *http2.RequestCtx) {

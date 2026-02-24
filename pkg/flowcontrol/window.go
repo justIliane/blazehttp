@@ -4,7 +4,7 @@ package flowcontrol
 import (
 	"sync/atomic"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 // Flow control constants per RFC 9113.

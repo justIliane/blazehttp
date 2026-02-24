@@ -6,9 +6,9 @@
 <h4 align="center">Faster than fasthttp, 2x faster than net/http, with browser-grade TLS/HTTP2 fingerprinting</h4>
 
 <p align="center">
-  <a href="https://pkg.go.dev/github.com/blazehttp/blazehttp"><img src="https://img.shields.io/badge/go-1.24+-00ADD8?logo=go" alt="Go 1.24+"></a>
+  <a href="https://pkg.go.dev/github.com/justIliane/blazehttp"><img src="https://img.shields.io/badge/go-1.24+-00ADD8?logo=go" alt="Go 1.24+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-  <a href="https://goreportcard.com/report/github.com/blazehttp/blazehttp"><img src="https://goreportcard.com/badge/github.com/blazehttp/blazehttp" alt="Go Report Card"></a>
+  <a href="https://goreportcard.com/report/github.com/justIliane/blazehttp"><img src="https://goreportcard.com/badge/github.com/justIliane/blazehttp" alt="Go Report Card"></a>
   <img src="https://img.shields.io/badge/tests-444%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/h2spec-146%2F146-brightgreen" alt="h2spec">
   <img src="https://img.shields.io/badge/fuzzing-1.36B%20execs-brightgreen" alt="Fuzzing">
@@ -100,8 +100,8 @@ Zero external dependencies for the core protocol stack. Every component — HPAC
 package main
 
 import (
-    "github.com/blazehttp/blazehttp/server"
-    "github.com/blazehttp/blazehttp/server/http2"
+    "github.com/justIliane/blazehttp/server"
+    "github.com/justIliane/blazehttp/server/http2"
 )
 
 func main() {
@@ -126,7 +126,7 @@ package main
 
 import (
     "fmt"
-    "github.com/blazehttp/blazehttp/client"
+    "github.com/justIliane/blazehttp/client"
 )
 
 func main() {
@@ -201,7 +201,7 @@ Firefox: 1:65536;4:131072;5:16384|12517377||m,p,a,s
 ## 📦 Installation
 
 ```bash
-go get github.com/blazehttp/blazehttp
+go get github.com/justIliane/blazehttp
 ```
 
 Requires Go 1.24+.
@@ -209,7 +209,7 @@ Requires Go 1.24+.
 ## 🏗️ Architecture
 
 ```
-github.com/blazehttp/blazehttp
+github.com/justIliane/blazehttp
 ├── server/                    HTTP/1.1 + HTTP/2 server
 │   ├── http1/                 HTTP/1.1 handler, request parser, response builder
 │   └── http2/                 HTTP/2 connection, stream dispatch, worker pool

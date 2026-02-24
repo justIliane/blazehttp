@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 // --- Chrome SETTINGS ---

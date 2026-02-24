@@ -1,6 +1,6 @@
 package http2
 
-import "github.com/blazehttp/blazehttp/pkg/frame"
+import "github.com/justIliane/blazehttp/pkg/frame"
 
 // ConnSettings holds the HTTP/2 connection settings.
 type ConnSettings struct {

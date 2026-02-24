@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 var robustnessHandler = func(ctx *http2.RequestCtx) {

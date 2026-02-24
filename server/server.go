@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blazehttp/blazehttp/server/http1"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server/http1"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // HTTP2Config holds HTTP/2-specific server settings.

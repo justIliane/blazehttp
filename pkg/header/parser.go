@@ -8,7 +8,7 @@ package header
 import (
 	"errors"
 
-	"github.com/blazehttp/blazehttp/internal/util"
+	"github.com/justIliane/blazehttp/internal/util"
 )
 
 // Parsing errors.

@@ -3,10 +3,10 @@ package http2
 import (
 	"sync"
 
-	"github.com/blazehttp/blazehttp/internal/util"
-	"github.com/blazehttp/blazehttp/pkg/bytespool"
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/internal/util"
+	"github.com/justIliane/blazehttp/pkg/bytespool"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
 )
 
 const maxRequestHeaders = 128

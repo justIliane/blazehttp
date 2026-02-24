@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/blazehttp/blazehttp/server"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // Pre-allocated payloads for zero-alloc handlers.

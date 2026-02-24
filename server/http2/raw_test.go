@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
-	"github.com/blazehttp/blazehttp/pkg/hpack"
-	"github.com/blazehttp/blazehttp/server"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/server"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // rawH2Conn wraps a TLS connection with frame reader/writer for raw HTTP/2 testing.

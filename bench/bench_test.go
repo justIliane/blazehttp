@@ -3,9 +3,9 @@ package bench
 import (
 	"testing"
 
-	"github.com/blazehttp/blazehttp/pkg/hpack"
-	"github.com/blazehttp/blazehttp/server/http1"
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/pkg/hpack"
+	"github.com/justIliane/blazehttp/server/http1"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 // Pre-built HTTP/1.1 request bytes for benchmarks.

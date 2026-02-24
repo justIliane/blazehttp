@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blazehttp/blazehttp/client/h2fingerprint"
-	blazetls "github.com/blazehttp/blazehttp/client/tls"
-	"github.com/blazehttp/blazehttp/pkg/stream"
+	"github.com/justIliane/blazehttp/client/h2fingerprint"
+	blazetls "github.com/justIliane/blazehttp/client/tls"
+	"github.com/justIliane/blazehttp/pkg/stream"
 )
 
 // ErrPoolClosed is returned when an operation is attempted on a closed pool.

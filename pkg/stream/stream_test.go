@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blazehttp/blazehttp/pkg/frame"
+	"github.com/justIliane/blazehttp/pkg/frame"
 )
 
 func newTestStream(id uint32) *Stream {

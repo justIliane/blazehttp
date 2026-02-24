@@ -5,7 +5,7 @@ Anti-detection HTTP/2 client with browser TLS and HTTP/2 fingerprinting.
 ## Quick Start
 
 ```go
-import "github.com/blazehttp/blazehttp/client"
+import "github.com/justIliane/blazehttp/client"
 
 c := client.NewChromeClient()
 defer c.Close()
@@ -43,7 +43,7 @@ BlazeHTTP uses [uTLS](https://github.com/refraction-networking/utls) to produce 
 JA3 and JA4 fingerprints can be computed from captured ClientHello bytes:
 
 ```go
-import blazetls "github.com/blazehttp/blazehttp/client/tls"
+import blazetls "github.com/justIliane/blazehttp/client/tls"
 
 // From raw ClientHello bytes:
 ja3Str, ja3Hash, err := blazetls.ComputeJA3FromRaw(raw)
@@ -100,7 +100,7 @@ settings|window_update|priority_tree|pseudo_headers
 ```
 
 ```go
-import "github.com/blazehttp/blazehttp/client/h2fingerprint"
+import "github.com/justIliane/blazehttp/client/h2fingerprint"
 
 hash := h2fingerprint.ComputeAkamaiHash(&h2fingerprint.ChromeH2)
 // "1:65536;3:1000;4:6291456;6:262144|15663105|3:0:200:0,5:0:100:0,7:0:0:0,9:7:0:0,11:3:0:0|m,a,s,p"

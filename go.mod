@@ -1,4 +1,4 @@
-module github.com/blazehttp/blazehttp
+module github.com/justIliane/blazehttp
 
 go 1.24.0
 

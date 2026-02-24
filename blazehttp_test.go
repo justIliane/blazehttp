@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blazehttp/blazehttp/server/http2"
+	"github.com/justIliane/blazehttp/server/http2"
 )
 
 func TestWrapHandler(t *testing.T) {

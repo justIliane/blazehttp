@@ -4,8 +4,8 @@ package http1
 import (
 	"sync"
 
-	"github.com/blazehttp/blazehttp/pkg/bytespool"
-	"github.com/blazehttp/blazehttp/pkg/header"
+	"github.com/justIliane/blazehttp/pkg/bytespool"
+	"github.com/justIliane/blazehttp/pkg/header"
 )
 
 // Request represents an HTTP/1.1 request. It is pooled via sync.Pool
