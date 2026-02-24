@@ -56,9 +56,15 @@ type h2Response struct {
 
 // responseWaiter bridges readLoop → RoundTrip.
 type responseWaiter struct {
-	resp *h2Response
-	err  error
-	done chan struct{}
+	resp     *h2Response
+	err      error
+	done     chan struct{}
+	closeOnce sync.Once
+}
+
+// signal safely closes the done channel exactly once.
+func (w *responseWaiter) signal() {
+	w.closeOnce.Do(func() { close(w.done) })
 }
 
 // roundTripRequest is sent from RoundTrip → writeLoop.
@@ -391,7 +397,7 @@ func (cc *ClientConn) handleHeaders(f *frame.Frame) error {
 	if f.HasEndStream() {
 		s.Transition(stream.EventRecvEndStream)
 		waiter.resp = resp
-		close(waiter.done)
+		waiter.signal()
 		cc.mu.Lock()
 		delete(cc.pending, streamID)
 		cc.mu.Unlock()
@@ -449,7 +455,7 @@ func (cc *ClientConn) handleData(f *frame.Frame) error {
 	if f.HasEndStream() {
 		s.Transition(stream.EventRecvEndStream)
 		if waiter != nil {
-			close(waiter.done)
+			waiter.signal()
 			cc.mu.Lock()
 			delete(cc.pending, streamID)
 			cc.mu.Unlock()
@@ -581,7 +587,7 @@ func (cc *ClientConn) handleRSTStream(f *frame.Frame) {
 
 	if waiter != nil {
 		waiter.err = fmt.Errorf("%w: %s", ErrStreamReset, f.ErrorCode)
-		close(waiter.done)
+		waiter.signal()
 	}
 	cc.streams.CloseStream(streamID)
 }
@@ -596,7 +602,7 @@ func (cc *ClientConn) handleGoAway(f *frame.Frame) {
 	for id, waiter := range cc.pending {
 		if id > f.LastStreamID {
 			waiter.err = ErrGoAway
-			close(waiter.done)
+			waiter.signal()
 			delete(cc.pending, id)
 		}
 	}
@@ -702,7 +708,7 @@ func (cc *ClientConn) writeRequest(rtr roundTripRequest) {
 	s, err := cc.streams.OpenStream(streamID)
 	if err != nil {
 		rtr.waiter.err = err
-		close(rtr.waiter.done)
+		rtr.waiter.signal()
 		cc.mu.Lock()
 		delete(cc.pending, streamID)
 		cc.mu.Unlock()
@@ -949,12 +955,7 @@ func (cc *ClientConn) signalAllPending(err error) {
 	cc.mu.Lock()
 	for id, waiter := range cc.pending {
 		waiter.err = err
-		select {
-		case <-waiter.done:
-			// Already closed.
-		default:
-			close(waiter.done)
-		}
+		waiter.signal()
 		delete(cc.pending, id)
 	}
 	cc.mu.Unlock()
