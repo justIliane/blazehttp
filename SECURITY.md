@@ -11,7 +11,7 @@
 If you discover a security vulnerability in BlazeHTTP, please report it responsibly:
 
 1. **Do not** open a public GitHub issue for security vulnerabilities
-2. Email your report to the maintainers (include "SECURITY" in the subject line)
+2. Open a [private security advisory](https://github.com/justIliane/blazehttp/security/advisories/new) on GitHub
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

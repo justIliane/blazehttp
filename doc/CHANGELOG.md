@@ -1,5 +1,16 @@
 # Changelog
 
+All notable changes to BlazeHTTP are documented here, newest first.
+
+## v1.0.0 (2026-02-24)
+
+Stable release. All phases complete. 448 tests passing, h2spec 146/146, 1.36B fuzz executions.
+
+- fix: align module path with actual GitHub repo (`justIliane/blazehttp`)
+- fix: prevent close-of-closed-channel panic in `responseWaiter`
+- fix: nil pointer dereference when h2 connection closes during response
+- docs: move logo into repo, fix badges, clarify dependencies
+
 ## Phase 9.5 — Anti-Detection Validation
 
 - Updated Akamai hash to 4-section format (settings|window|priorities|pseudoHeaders)

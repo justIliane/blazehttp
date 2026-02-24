@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://onvi3bhqlbq6rqxv.public.blob.vercel-storage.com/blazehttplogoe.png" alt="BlazeHTTP" width="650">
+  <img src="doc/logo.png" alt="BlazeHTTP" width="650">
 </p>
 
 <h3 align="center">⚡ High-performance HTTP/1.1 + HTTP/2 server & client for Go</h3>
@@ -9,9 +9,10 @@
   <a href="https://pkg.go.dev/github.com/justIliane/blazehttp"><img src="https://img.shields.io/badge/go-1.24+-00ADD8?logo=go" alt="Go 1.24+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://goreportcard.com/report/github.com/justIliane/blazehttp"><img src="https://goreportcard.com/badge/github.com/justIliane/blazehttp" alt="Go Report Card"></a>
-  <img src="https://img.shields.io/badge/tests-444%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-448%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/h2spec-146%2F146-brightgreen" alt="h2spec">
   <img src="https://img.shields.io/badge/fuzzing-1.36B%20execs-brightgreen" alt="Fuzzing">
+  <img src="https://img.shields.io/badge/race_detector-clean-brightgreen" alt="Race Detector">
 </p>
 
 ---
@@ -24,7 +25,7 @@
 
 **BlazeHTTP solves both problems.** It's a from-scratch HTTP/1.1 + HTTP/2 implementation built for two things: **raw speed** and **anti-detection**. The server side is 10% faster than fasthttp for HTTP/1.1 and 2x faster than net/http for HTTP/2. The client side produces browser-identical TLS and HTTP/2 fingerprints — Chrome, Firefox, or Safari — making your requests indistinguishable from real browser traffic.
 
-Zero external dependencies for the core protocol stack. Every component — HPACK codec, frame reader/writer, flow control, stream manager — is built from scratch with zero-allocation hot paths and object pooling.
+Only one external dependency: [uTLS](https://github.com/refraction-networking/utls) for TLS fingerprinting. Every other component — HPACK codec, frame reader/writer, flow control, stream manager — is built from scratch with zero-allocation hot paths and object pooling.
 
 ## 📊 Performance
 
@@ -115,7 +116,7 @@ func main() {
     })
 
     // Auto-generates TLS cert, serves HTTP/1.1 + HTTP/2
-    s.ListenAndServeTLS(":443")
+    s.ListenAndServeTLS(":8443")
 }
 ```
 
@@ -288,7 +289,7 @@ BlazeHTTP was built in 15 phases:
 | **9.4** | Client API & features | Cookie jar, redirects, retry, proxy, DoBatch |
 | **9.5** | Anti-detection validation | JA3/JA4 verified, H2 verified, benchmarks, docs |
 
-**Total: 444 tests, 72 benchmarks, 1.36 billion fuzzing executions, 0 data races.**
+**Total: 448 tests, 72 benchmarks, 1.36 billion fuzzing executions, 0 data races.**
 
 ## 🤝 Contributing
 

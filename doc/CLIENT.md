@@ -23,10 +23,12 @@ fmt.Println(resp.StatusCode, string(resp.Body))
 |---|---|---|---|
 | `NewChromeClient()` | Chrome 120 (uTLS) | Chrome H2 | Chrome 120 |
 | `NewFirefoxClient()` | Firefox 121 (uTLS) | Firefox H2 | Firefox 121 |
-| `NewSafariClient()` | Safari 17 (uTLS) | Chrome H2 | Safari 17 |
+| `NewSafariClient()` | Safari 17 (uTLS) | Chrome H2* | Safari 17 |
 | `NewRandomClient()` | Randomized (uTLS) | Chrome H2 | Chrome 120 |
 
 Each profile emulates both the TLS ClientHello and the HTTP/2 connection fingerprint of the specified browser.
+
+> \* Safari uses Chrome's H2 profile as a fallback — Safari's HTTP/2 fingerprint is very close to Chrome's in practice (same SETTINGS order and values). A dedicated Safari H2 profile may be added in a future release.
 
 ## TLS Fingerprinting
 
